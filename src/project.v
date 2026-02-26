@@ -1,27 +1,72 @@
 /*
- * Copyright (c) 2024 Your Name
  * SPDX-License-Identifier: Apache-2.0
  */
-
 `default_nettype none
 
-module tt_um_example (
-    input  wire [7:0] ui_in,    // Dedicated inputs
-    output wire [7:0] uo_out,   // Dedicated outputs
-    input  wire [7:0] uio_in,   // IOs: Input path
-    output wire [7:0] uio_out,  // IOs: Output path
-    output wire [7:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
-    input  wire       ena,      // always 1 when the design is powered, so you can ignore it
-    input  wire       clk,      // clock
-    input  wire       rst_n     // reset_n - low to reset
+module tt_um_lif_neuron (
+    input  wire [7:0] ui_in,
+    output wire [7:0] uo_out,
+    input  wire [7:0] uio_in,
+    output wire [7:0] uio_out,
+    output wire [7:0] uio_oe,
+    input  wire       ena,
+    input  wire       clk,
+    input  wire       rst_n
 );
 
-  // All output pins must be assigned. If not used, assign to 0.
-  assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
-  assign uio_out = 0;
-  assign uio_oe  = 0;
+    assign uio_out = 8'b0;
+    assign uio_oe  = 8'b0;
+    wire _unused = &{uio_in};
 
-  // List all unused inputs to prevent warnings
-  wire _unused = &{ena, clk, rst_n, 1'b0};
+    localparam integer V_BITS      = 9;
+    localparam integer LEAK_SHIFT  = 3;          // leak ~= 12.5%/cycle
+    localparam [V_BITS-1:0] THRESH = 9'd180;
+
+    // Refractory period (cycles after a spike where neuron is silent)
+    localparam integer REFRACT_CYCLES = 8;
+    localparam integer R_BITS = 4;              // enough to hold up to 15
+
+    reg [V_BITS-1:0] v;
+    reg              spike_r;
+    reg [R_BITS-1:0] refr;                      // refractory counter
+
+    wire [V_BITS-1:0] i_in   = {1'b0, ui_in};
+    wire [V_BITS-1:0] v_leak = v - (v >> LEAK_SHIFT);
+    wire [V_BITS-1:0] v_pre  = v_leak + i_in;
+
+    always @(posedge clk) begin
+        if (!rst_n) begin
+            v       <= {V_BITS{1'b0}};
+            spike_r <= 1'b0;
+            refr    <= {R_BITS{1'b0}};
+        end else if (ena) begin
+            // default: no spike unless we explicitly fire this cycle
+            spike_r <= 1'b0;
+
+            if (refr != 0) begin
+                // In refractory: count down, hold membrane at 0 (or hold v if you prefer)
+                refr <= refr - 1'b1;
+                v    <= {V_BITS{1'b0}};
+            end else begin
+                // Normal integrate + fire
+                if (v_pre >= THRESH) begin
+                    spike_r <= 1'b1;
+                    v       <= {V_BITS{1'b0}};
+                    refr    <= REFRACT_CYCLES[R_BITS-1:0];
+                end else begin
+                    v <= v_pre;
+                end
+            end
+        end else begin
+            // not enabled: hold state, keep output quiet
+            spike_r <= 1'b0;
+            v       <= v;
+            refr    <= refr;
+        end
+    end
+
+    assign uo_out[0]   = spike_r;
+    assign uo_out[7:1] = v[V_BITS-1:V_BITS-7];
 
 endmodule
+
