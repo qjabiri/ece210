@@ -1,20 +1,63 @@
-<!---
+# Leaky Integrate-and-Fire (LIF) Neuron
 
-This file is used to generate your project datasheet. Please fill in the information below and delete any unused
-sections.
+This project implements a digital current-based Leaky Integrate-and-Fire (LIF) neuron model in Verilog for Tiny Tapeout.
 
-You can also include images in this folder and reference them in the markdown. Each image must be less than
-512 kb in size, and the combined size of all images must be less than 1 MB.
--->
+The neuron integrates an input current over time while applying a configurable leak. When the membrane potential exceeds a threshold, the neuron emits a spike and enters a refractory period before integrating again.
+
+The design demonstrates neuromorphic computation primitives using simple synchronous digital logic and is intended for educational and experimental purposes.
+
+---
 
 ## How it works
 
-Explain how your project works
+At every clock cycle:
 
-## How to test
+1. Input current is added to the membrane potential
+2. A leak term reduces the accumulated voltage
+3. If the voltage exceeds a threshold:
+   - A spike is generated (`uo_out[0]`)
+   - The voltage resets
+   - A refractory counter prevents immediate re-spiking
 
-Explain how to use your project
+---
 
-## External hardware
+## Pinout
 
-List external hardware used in your project (e.g. PMOD, LED display, etc), if any
+### Inputs
+
+| Pin | Name | Description |
+|-----|------|-------------|
+| ui[7:0] | I_in | Input current magnitude |
+
+### Outputs
+
+| Pin | Name | Description |
+|-----|------|-------------|
+| uo[0] | spike | Spike output |
+| uo[7:1] | debug | Membrane potential (upper bits) |
+
+### Bidirectional
+
+Unused.
+
+---
+
+## Clock
+
+10 MHz system clock.
+
+---
+
+## Applications
+
+- Neuromorphic computing experiments
+- Educational demonstrations of neuron models
+- Digital spiking neural networks
+- Hardware neuroscience research
+
+---
+
+## Author
+
+Qudsi Aljabiri
+
